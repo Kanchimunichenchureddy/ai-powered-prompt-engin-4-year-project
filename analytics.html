@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - PromptEngine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --primary-light: #fafafa;
+            --accent-copper: #c17a5b;
+            --accent-teal: #4a9b8e;
+            --text-dark: #2d2d2d;
+            --text-light: #ffffff;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+            min-height: 100vh;
+        }
+        
+        .floating-nav {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+            transition: all 0.6s ease;
+        }
+        
+        .metric-value {
+            background: linear-gradient(135deg, var(--accent-copper), var(--accent-teal));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .trend-up {
+            color: #10b981;
+        }
+        
+        .trend-down {
+            color: #ef4444;
+        }
+        
+        .filter-button {
+            transition: all 0.3s ease;
+        }
+        
+        .filter-button.active {
+            background: linear-gradient(135deg, var(--accent-copper), var(--accent-teal));
+            color: white;
+        }
+        
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .progress-ring-circle {
+            stroke-dasharray: 251.2;
+            stroke-dashoffset: 251.2;
+            transition: stroke-dashoffset 1s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="floating-nav fixed top-0 left-0 right-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold text-sm">PE</span>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800">PromptEngine</h1>
+            </div>
+            
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="index.html" class="text-gray-600 hover:text-orange-600 transition-colors">Optimizer</a>
+                <a href="templates.html" class="text-gray-600 hover:text-orange-600 transition-colors">Templates</a>
+                <a href="analytics.html" class="text-gray-700 hover:text-orange-600 font-medium transition-colors">Analytics</a>
+                <a href="history.html" class="text-gray-600 hover:text-orange-600 transition-colors">History</a>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <button class="p-2 text-gray-600 hover:text-orange-600 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5-5-5h5v-12"></path>
+                    </svg>
+                </button>
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600"></div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <section class="pt-24 pb-12 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4 fade-in">
+                    Analytics Dashboard
+                </h1>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto fade-in">
+                    Track your prompt engineering performance, identify trends, and optimize your AI interactions with comprehensive analytics.
+                </p>
+            </div>
+            
+            <!-- Time Range Filter -->
+            <div class="flex justify-center space-x-4 mb-8 fade-in">
+                <button class="filter-button active px-6 py-2 rounded-lg font-medium bg-gray-100 text-gray-700" data-range="7d">
+                    Last 7 Days
+                </button>
+                <button class="filter-button px-6 py-2 rounded-lg font-medium bg-gray-100 text-gray-700" data-range="30d">
+                    Last 30 Days
+                </button>
+                <button class="filter-button px-6 py-2 rounded-lg font-medium bg-gray-100 text-gray-700" data-range="90d">
+                    Last 90 Days
+                </button>
+                <button class="filter-button px-6 py-2 rounded-lg font-medium bg-gray-100 text-gray-700" data-range="1y">
+                    Last Year
+                </button>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Key Metrics -->
+    <section class="pb-8 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Total Prompts -->
+                <div class="metric-card rounded-xl p-6 fade-in">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-sm trend-up flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"></path>
+                            </svg>
+                            +12.5%
+                        </span>
+                    </div>
+                    <h3 class="text-2xl font-bold metric-value mb-1">1,247</h3>
+                    <p class="text-gray-600 text-sm">Total Prompts</p>
+                </div>
+                
+                <!-- Average Score -->
+                <div class="metric-card rounded-xl p-6 fade-in">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-sm trend-up flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"></path>
+                            </svg>
+                            +8.3%
+                        </span>
+                    </div>
+                    <h3 class="text-2xl font-bold metric-value mb-1">8.4</h3>
+                    <p class="text-gray-600 text-sm">Avg Quality Score</p>
+                </div>
+                
+                <!-- Optimization Rate -->
+                <div class="metric-card rounded-xl p-6 fade-in">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-sm trend-up flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"></path>
+                            </svg>
+                            +15.7%
+                        </span>
+                    </div>
+                    <h3 class="text-2xl font-bold metric-value mb-1">94.2%</h3>
+                    <p class="text-gray-600 text-sm">Optimization Rate</p>
+                </div>
+                
+                <!-- Time Saved -->
+                <div class="metric-card rounded-xl p-6 fade-in">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-sm trend-up flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17l9.2-9.2M17 17V7H7"></path>
+                            </svg>
+                            +22.1%
+                        </span>
+                    </div>
+                    <h3 class="text-2xl font-bold metric-value mb-1">47.3h</h3>
+                    <p class="text-gray-600 text-sm">Time Saved</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Charts Section -->
+    <section class="pb-8 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Quality Score Trends -->
+                <div class="chart-container rounded-xl p-6 fade-in">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800">Quality Score Trends</h3>
+                        <div class="flex items-center space-x-2">
+                            <div class="flex items-center space-x-1">
+                                <div class="w-3 h-3 bg-teal-500 rounded-full"></div>
+                                <span class="text-sm text-gray-600">Clarity</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+                                <span class="text-sm text-gray-600">Specificity</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <div class="w-3 h-3 bg-purple-500 rounded-full"></div>
+                                <span class="text-sm text-gray-600">Creativity</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                <span class="text-sm text-gray-600">Technical</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="quality-trends-chart" style="height: 300px;"></div>
+                </div>
+                
+                <!-- Prompt Usage by Category -->
+                <div class="chart-container rounded-xl p-6 fade-in">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800">Usage by Category</h3>
+                        <button class="text-sm text-orange-600 hover:text-orange-700 font-medium">View Details</button>
+                    </div>
+                    <div id="usage-category-chart" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Detailed Analytics -->
+    <section class="pb-8 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Keyword Analysis -->
+                <div class="chart-container rounded-xl p-6 fade-in">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-6">Top Performing Keywords</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-700">"comprehensive"</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-teal-500 to-teal-600" style="width: 92%"></div>
+                                </div>
+                                <span class="text-sm font-medium text-gray-600">92%</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-700">"detailed"</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-orange-500 to-orange-600" style="width: 88%"></div>
+                                </div>
+                                <span class="text-sm font-medium text-gray-600">88%</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-700">"professional"</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-purple-500 to-purple-600" style="width: 85%"></div>
+                                </div>
+                                <span class="text-sm font-medium text-gray-600">85%</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-700">"optimized"</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-blue-500 to-blue-600" style="width: 82%"></div>
+                                </div>
+                                <span class="text-sm font-medium text-gray-600">82%</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-700">"efficient"</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-green-500 to-green-600" style="width: 79%"></div>
+                                </div>
+                                <span class="text-sm font-medium text-gray-600">79%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Model Performance -->
+                <div class="chart-container rounded-xl p-6 fade-in">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-6">Model Performance</h3>
+                    <div class="space-y-6">
+                        <div class="text-center">
+                            <div class="relative inline-flex items-center justify-center mb-2">
+                                <svg class="progress-ring w-20 h-20">
+                                    <circle cx="40" cy="40" r="36" stroke="#e5e7eb" stroke-width="8" fill="transparent"></circle>
+                                    <circle cx="40" cy="40" r="36" stroke="#c17a5b" stroke-width="8" fill="transparent" class="progress-ring-circle" style="stroke-dashoffset: 62.8;"></circle>
+                                </svg>
+                                <div class="absolute text-center">
+                                    <div class="text-lg font-bold text-gray-800">92%</div>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-600">GPT-4</div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="relative inline-flex items-center justify-center mb-2">
+                                <svg class="progress-ring w-20 h-20">
+                                    <circle cx="40" cy="40" r="36" stroke="#e5e7eb" stroke-width="8" fill="transparent"></circle>
+                                    <circle cx="40" cy="40" r="36" stroke="#4a9b8e" stroke-width="8" fill="transparent" class="progress-ring-circle" style="stroke-dashoffset: 87.92;"></circle>
+                                </svg>
+                                <div class="absolute text-center">
+                                    <div class="text-lg font-bold text-gray-800">89%</div>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-600">Claude</div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <div class="relative inline-flex items-center justify-center mb-2">
+                                <svg class="progress-ring w-20 h-20">
+                                    <circle cx="40" cy="40" r="36" stroke="#e5e7eb" stroke-width="8" fill="transparent"></circle>
+                                    <circle cx="40" cy="40" r="36" stroke="#8b5cf6" stroke-width="8" fill="transparent" class="progress-ring-circle" style="stroke-dashoffset: 100.48;"></circle>
+                                </svg>
+                                <div class="absolute text-center">
+                                    <div class="text-lg font-bold text-gray-800">87%</div>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-600">Gemini</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Achievements -->
+                <div class="chart-container rounded-xl p-6 fade-in">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-6">Recent Achievements</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg">
+                            <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-800">Quality Master</div>
+                                <div class="text-xs text-gray-600">Achieved 9.0+ average score</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3 p-3 bg-gradient-to-r from-green-50 to-teal-50 rounded-lg">
+                            <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-800">Efficiency Expert</div>
+                                <div class="text-xs text-gray-600">Saved 10+ hours this week</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
+                            <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-800">Collaboration Pro</div>
+                                <div class="text-xs text-gray-600">Shared 25+ prompts</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-800">Code Optimizer</div>
+                                <div class="text-xs text-gray-600">Improved 50+ prompts</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12 px-6">
+        <div class="max-w-7xl mx-auto text-center">
+            <div class="flex items-center justify-center space-x-3 mb-4">
+                <div class="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold text-sm">PE</span>
+                </div>
+                <h3 class="text-xl font-bold">PromptEngine</h3>
+            </div>
+            <p class="text-gray-400 mb-6">Advanced AI-Powered Prompt Optimization Studio</p>
+            <p class="text-sm text-gray-500">© 2024 PromptEngine. Crafted with precision for AI professionals.</p>
+        </div>
+    </footer>
+    
+    <script>
+        // Analytics Dashboard functionality
+        class AnalyticsDashboard {
+            constructor() {
+                this.currentTimeRange = '7d';
+                this.charts = {};
+                this.init();
+            }
+            
+            init() {
+                this.setupEventListeners();
+                this.initializeAnimations();
+                this.initializeCharts();
+                this.animateProgressRings();
+            }
+            
+            setupEventListeners() {
+                // Time range filters
+                document.querySelectorAll('.filter-button').forEach(button => {
+                    button.addEventListener('click', (e) => this.changeTimeRange(e.target.dataset.range));
+                });
+            }
+            
+            initializeAnimations() {
+                // Fade in animations
+                const observerOptions = {
+                    threshold: 0.1,
+                    rootMargin: '0px 0px -50px 0px'
+                };
+                
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                        }
+                    });
+                }, observerOptions);
+                
+                document.querySelectorAll('.fade-in').forEach(el => {
+                    observer.observe(el);
+                });
+            }
+            
+            changeTimeRange(range) {
+                // Update active filter
+                document.querySelectorAll('.filter-button').forEach(button => {
+                    button.classList.remove('active');
+                    button.classList.add('bg-gray-100', 'text-gray-700');
+                });
+                
+                const activeButton = document.querySelector(`[data-range="${range}"]`);
+                activeButton.classList.add('active');
+                activeButton.classList.remove('bg-gray-100', 'text-gray-700');
+                
+                this.currentTimeRange = range;
+                this.updateCharts();
+            }
+            
+            initializeCharts() {
+                this.createQualityTrendsChart();
+                this.createUsageCategoryChart();
+            }
+            
+            createQualityTrendsChart() {
+                const chartDom = document.getElementById('quality-trends-chart');
+                const myChart = echarts.init(chartDom);
+                
+                const option = {
+                    tooltip: {
+                        trigger: 'axis',
+                        axisPointer: {
+                            type: 'cross'
+                        }
+                    },
+                    legend: {
+                        data: ['Clarity', 'Specificity', 'Creativity', 'Technical'],
+                        bottom: 0
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '15%',
+                        containLabel: true
+                    },
+                    xAxis: {
+                        type: 'category',
+                        boundaryGap: false,
+                        data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                    },
+                    yAxis: {
+                        type: 'value',
+                        min: 0,
+                        max: 10
+                    },
+                    series: [
+                        {
+                            name: 'Clarity',
+                            type: 'line',
+                            data: [7.2, 7.8, 8.1, 8.5, 8.3, 8.7, 9.1],
+                            smooth: true,
+                            lineStyle: {
+                                color: '#4a9b8e'
+                            },
+                            itemStyle: {
+                                color: '#4a9b8e'
+                            }
+                        },
+                        {
+                            name: 'Specificity',
+                            type: 'line',
+                            data: [6.8, 7.1, 7.5, 8.0, 8.2, 8.6, 8.9],
+                            smooth: true,
+                            lineStyle: {
+                                color: '#c17a5b'
+                            },
+                            itemStyle: {
+                                color: '#c17a5b'
+                            }
+                        },
+                        {
+                            name: 'Creativity',
+                            type: 'line',
+                            data: [7.5, 7.9, 8.2, 8.1, 8.4, 8.8, 9.0],
+                            smooth: true,
+                            lineStyle: {
+                                color: '#8b5cf6'
+                            },
+                            itemStyle: {
+                                color: '#8b5cf6'
+                            }
+                        },
+                        {
+                            name: 'Technical',
+                            type: 'line',
+                            data: [6.9, 7.3, 7.8, 8.2, 8.5, 8.7, 8.8],
+                            smooth: true,
+                            lineStyle: {
+                                color: '#3b82f6'
+                            },
+                            itemStyle: {
+                                color: '#3b82f6'
+                            }
+                        }
+                    ]
+                };
+                
+                myChart.setOption(option);
+                this.charts.qualityTrends = myChart;
+                
+                // Animate chart appearance
+                setTimeout(() => {
+                    myChart.resize();
+                }, 100);
+            }
+            
+            createUsageCategoryChart() {
+                const chartDom = document.getElementById('usage-category-chart');
+                const myChart = echarts.init(chartDom);
+                
+                const option = {
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: '{a} <br/>{b}: {c} ({d}%)'
+                    },
+                    legend: {
+                        orient: 'vertical',
+                        left: 'left',
+                        data: ['AI Development', 'Image Generation', 'Chatbot Creation', 'Data Analysis']
+                    },
+                    series: [
+                        {
+                            name: 'Usage',
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            center: ['60%', '50%'],
+                            avoidLabelOverlap: false,
+                            itemStyle: {
+                                borderRadius: 8,
+                                borderColor: '#fff',
+                                borderWidth: 2
+                            },
+                            label: {
+                                show: false,
+                                position: 'center'
+                            },
+                            emphasis: {
+                                label: {
+                                    show: true,
+                                    fontSize: '18',
+                                    fontWeight: 'bold'
+                                }
+                            },
+                            labelLine: {
+                                show: false
+                            },
+                            data: [
+                                {
+                                    value: 435,
+                                    name: 'AI Development',
+                                    itemStyle: { color: '#4a9b8e' }
+                                },
+                                {
+                                    value: 312,
+                                    name: 'Image Generation',
+                                    itemStyle: { color: '#c17a5b' }
+                                },
+                                {
+                                    value: 289,
+                                    name: 'Chatbot Creation',
+                                    itemStyle: { color: '#8b5cf6' }
+                                },
+                                {
+                                    value: 211,
+                                    name: 'Data Analysis',
+                                    itemStyle: { color: '#3b82f6' }
+                                }
+                            ]
+                        }
+                    ]
+                };
+                
+                myChart.setOption(option);
+                this.charts.usageCategory = myChart;
+            }
+            
+            animateProgressRings() {
+                // Animate progress rings
+                const rings = document.querySelectorAll('.progress-ring-circle');
+                rings.forEach((ring, index) => {
+                    const percentage = [92, 89, 87][index];
+                    const circumference = 2 * Math.PI * 36;
+                    const offset = circumference - (percentage / 100) * circumference;
+                    
+                    anime({
+                        targets: ring,
+                        strokeDashoffset: [circumference, offset],
+                        duration: 1500,
+                        delay: index * 200,
+                        easing: 'easeOutQuart'
+                    });
+                });
+            }
+            
+            updateCharts() {
+                // Simulate data update based on time range
+                const timeRangeData = {
+                    '7d': {
+                        qualityTrends: {
+                            xAxis: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                            series: [
+                                [7.2, 7.8, 8.1, 8.5, 8.3, 8.7, 9.1],
+                                [6.8, 7.1, 7.5, 8.0, 8.2, 8.6, 8.9],
+                                [7.5, 7.9, 8.2, 8.1, 8.4, 8.8, 9.0],
+                                [6.9, 7.3, 7.8, 8.2, 8.5, 8.7, 8.8]
+                            ]
+                        }
+                    },
+                    '30d': {
+                        qualityTrends: {
+                            xAxis: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                            series: [
+                                [7.5, 8.0, 8.3, 8.7],
+                                [7.2, 7.8, 8.1, 8.5],
+                                [7.8, 8.1, 8.4, 8.9],
+                                [7.1, 7.6, 8.0, 8.3]
+                            ]
+                        }
+                    }
+                };
+                
+                const data = timeRangeData[this.currentTimeRange] || timeRangeData['7d'];
+                
+                // Update quality trends chart
+                if (this.charts.qualityTrends) {
+                    const option = {
+                        xAxis: {
+                            data: data.qualityTrends.xAxis
+                        },
+                        series: [
+                            { data: data.qualityTrends.series[0] },
+                            { data: data.qualityTrends.series[1] },
+                            { data: data.qualityTrends.series[2] },
+                            { data: data.qualityTrends.series[3] }
+                        ]
+                    };
+                    this.charts.qualityTrends.setOption(option);
+                }
+            }
+        }
+        
+        // Initialize analytics dashboard
+        const analyticsDashboard = new AnalyticsDashboard();
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            Object.values(analyticsDashboard.charts).forEach(chart => {
+                chart.resize();
+            });
+        });
+    </script>
+    <script src="analytics.js"></script>
+</body>
+</html>
