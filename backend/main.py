@@ -39,7 +39,7 @@ app.add_middleware(
 )
 
 # Import and include authentication router
-from auth import auth_router
+from auth import auth_router, get_current_user
 app.include_router(auth_router)
 
 # Create tables on startup
@@ -72,15 +72,23 @@ def read_root():
     return {"message": "PromptEngine Backend API", "version": "1.0.0"}
 
 @app.post("/optimize", response_model=schemas.OptimizePromptResponse)
-def optimize_prompt(request: schemas.OptimizePromptRequest, db: Session = Depends(database.get_db)):
+def optimize_prompt(
+    request: schemas.OptimizePromptRequest, 
+    db: Session = Depends(database.get_db),
+    current_user: dict = Depends(lambda: None)  # Optional authentication
+):
     """
     Optimize a prompt using Gemini service
     """
     try:
         logger.info(f"📝 Optimize request received - Mode: {request.mode}")
         
+        # Get user_id if authenticated
+        user_id = current_user.get("id") if current_user else None
+        
         # Create prompt record
         prompt_record = models.Prompt(
+            user_id=user_id,
             original=request.original_prompt,
             mode=request.mode
         )
@@ -125,6 +133,7 @@ def optimize_prompt(request: schemas.OptimizePromptRequest, db: Session = Depend
         
         # Save optimization history
         history_record = models.OptimizationHistory(
+            user_id=user_id,
             prompt_id=prompt_record.id,
             original_prompt=request.original_prompt,
             optimized_prompt=optimized_prompt,
@@ -134,6 +143,25 @@ def optimize_prompt(request: schemas.OptimizePromptRequest, db: Session = Depend
         )
         db.add(history_record)
         db.commit()
+        
+        # Track user activity if authenticated
+        if user_id:
+            activity = models.UserActivity(
+                user_id=user_id,
+                activity_type="prompt_optimize",
+                activity_data={
+                    "original_prompt": request.original_prompt[:200],  # Truncate for storage
+                    "mode": request.mode
+                },
+                meta_data={
+                    "model": gemini_service.model,
+                    "improvement": improvement_percentage,
+                    "overall_score": scores["overall"]
+                }
+            )
+            db.add(activity)
+            db.commit()
+            logger.info(f"✓ Activity logged for user {user_id}")
         
         return schemas.OptimizePromptResponse(
             original_prompt=request.original_prompt,
@@ -202,22 +230,46 @@ def calculate_quality_score(request: schemas.AnalyzePromptRequest):
         raise HTTPException(status_code=500, detail=f"Error calculating quality score: {str(e)}")
 
 @app.post("/assistant", response_model=schemas.AssistantMessageResponse)
-def assistant_message(request: schemas.AssistantMessageRequest, db: Session = Depends(database.get_db)):
+def assistant_message(
+    request: schemas.AssistantMessageRequest, 
+    db: Session = Depends(database.get_db),
+    current_user: dict = Depends(lambda: None)  # Optional authentication
+):
     """
     Get AI assistant response
     """
     try:
+        # Get user_id if authenticated
+        user_id = current_user.get("id") if current_user else None
+        
         # Generate response
         response_text = gemini_service.generate_assistant_response(request.user_message, request.prompt_context)
         
         # Save message
         message_record = models.AssistantMessage(
+            user_id=user_id,
             user_message=request.user_message,
             assistant_response=response_text,
             prompt_context=request.prompt_context
         )
         db.add(message_record)
         db.commit()
+        
+        # Track user activity if authenticated
+        if user_id:
+            activity = models.UserActivity(
+                user_id=user_id,
+                activity_type="chat",
+                activity_data={
+                    "user_message": request.user_message[:200],
+                    "context": request.prompt_context
+                },
+                meta_data={
+                    "response_length": len(response_text)
+                }
+            )
+            db.add(activity)
+            db.commit()
         
         return schemas.AssistantMessageResponse(
             user_message=request.user_message,
@@ -350,6 +402,120 @@ def get_available_modes():
     except Exception as e:
         logger.exception("Error getting available modes")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/user/profile")
+def get_user_profile(current_user: dict = Depends(get_current_user)):
+    """Get current user profile"""
+    return {
+        "id": current_user["id"],
+        "email": current_user["email"],
+        "firstName": current_user["firstName"],
+        "lastName": current_user["lastName"],
+        "role": current_user["role"],
+        "createdAt": current_user["createdAt"].isoformat() if current_user.get("createdAt") else None,
+        "lastLogin": current_user["lastLogin"].isoformat() if current_user.get("lastLogin") else None
+    }
+
+@app.get("/user/history")
+def get_user_history(
+    limit: int = 50,
+    activity_type: str = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Get user's activity history"""
+    try:
+        query = db.query(models.UserActivity).filter(
+            models.UserActivity.user_id == current_user["id"]
+        )
+        
+        if activity_type:
+            query = query.filter(models.UserActivity.activity_type == activity_type)
+        
+        activities = query.order_by(
+            models.UserActivity.created_at.desc()
+        ).limit(limit).all()
+        
+        return [
+            {
+                "id": a.id,
+                "activity_type": a.activity_type,
+                "activity_data": a.activity_data,
+                "metadata": a.meta_data,  # Return as 'metadata' for API consistency
+                "created_at": a.created_at.isoformat()
+            }
+            for a in activities
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching history: {str(e)}")
+
+@app.get("/user/analytics")
+def get_user_analytics(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Get user analytics and statistics"""
+    try:
+        from sqlalchemy import func
+        from datetime import timedelta
+        
+        user_id = current_user["id"]
+        
+        # Total activities
+        total_activities = db.query(models.UserActivity).filter(
+            models.UserActivity.user_id == user_id
+        ).count()
+        
+        # Activity breakdown by type
+        activity_breakdown_query = db.query(
+            models.UserActivity.activity_type,
+            func.count(models.UserActivity.id)
+        ).filter(
+            models.UserActivity.user_id == user_id
+        ).group_by(models.UserActivity.activity_type).all()
+        
+        activity_breakdown = {activity_type: count for activity_type, count in activity_breakdown_query}
+        
+        # Recent activity (last 7 days)
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        recent_count = db.query(models.UserActivity).filter(
+            models.UserActivity.user_id == user_id,
+            models.UserActivity.created_at >= seven_days_ago
+        ).count()
+        
+        # Most used mode
+        mode_stats_query = db.query(
+            models.Prompt.mode,
+            func.count(models.Prompt.id)
+        ).filter(
+            models.Prompt.user_id == user_id
+        ).group_by(models.Prompt.mode).all()
+        
+        mode_usage = {mode: count for mode, count in mode_stats_query}
+        
+        # Total prompts optimized
+        total_prompts = db.query(models.Prompt).filter(
+            models.Prompt.user_id == user_id
+        ).count()
+        
+        # Average improvement percentage
+        avg_improvement = db.query(func.avg(models.OptimizationHistory.improvement_percentage)).filter(
+            models.OptimizationHistory.user_id == user_id
+        ).scalar() or 0.0
+        
+        return {
+            "total_activities": total_activities,
+            "total_prompts": total_prompts,
+            "activity_breakdown": activity_breakdown,
+            "recent_activity_count": recent_count,
+            "mode_usage": mode_usage,
+            "average_improvement": round(avg_improvement, 2),
+            "member_since": current_user.get("createdAt").isoformat() if current_user.get("createdAt") else None,
+            "last_login": current_user.get("lastLogin").isoformat() if current_user.get("lastLogin") else None
+        }
+    except Exception as e:
+        logger.error(f"Analytics error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating analytics: {str(e)}")
 
 @app.get("/health")
 def health_check():
