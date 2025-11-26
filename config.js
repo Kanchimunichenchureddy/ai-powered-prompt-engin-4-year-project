@@ -5,7 +5,7 @@ const API_CONFIG = {
     // IMPORTANT: Replace 'YOUR-SERVICE-NAME' with your actual Render service name
     // Example: if your Render service is at finallayer-backend.onrender.com
     // then use: 'https://finallayer-backend.onrender.com'
-    PRODUCTION_URL: 'https://YOUR-SERVICE-NAME.onrender.com',
+    PRODUCTION_URL: 'https://ai-powered-prompt-engineering-backend.onrender.com/',
 
     // Local development URL
     LOCAL_URL: 'http://127.0.0.1:8000',
