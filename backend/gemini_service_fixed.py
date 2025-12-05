@@ -140,7 +140,8 @@ class GeminiService:
             "illustration": "gemini-image-art",
             "stylized": "gemini-image-stylized",
             "fast": "gemini-image-mini",
-        }
+        }\r
+    \r
     def _apply_chain_of_thought(self, prompt: str, mode: str = "ai-dev") -> str:
         """
         Apply Chain-of-Thought (CoT) reasoning to break complex prompts into logical steps.

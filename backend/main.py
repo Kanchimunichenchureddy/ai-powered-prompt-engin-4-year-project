@@ -24,6 +24,7 @@ app = FastAPI(title="PromptEngine Backend", version="1.0.0", debug=DEBUG)
 
 # CORS middleware
 origins = [
+    "https://ai-powered-prompt-engin-4-year-proj.vercel.app",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
     "http://localhost:3000",
